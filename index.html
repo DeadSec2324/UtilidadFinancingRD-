@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#121212">
+    <title>Utilidad Financiera</title>
+    
+    <!-- Librería OCR para leer imágenes sin internet (Client-side) -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+
+    <style>
+        :root {
+            --bg: #121212;
+            --surface: #1e1e1e;
+            --surface-elevated: #2c2c2c;
+            --primary: #03dac6;
+            --text: #e0e0e0;
+            --text-muted: #9e9e9e;
+            --danger: #cf6679;
+        }
+        
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 0;
+            padding-top: calc(60px + env(safe-area-inset-top));
+            padding-bottom: calc(70px + env(safe-area-inset-bottom));
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .app-container {
+            width: 100%;
+            max-width: 450px;
+            padding: 15px;
+        }
+
+        .header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: calc(60px + env(safe-area-inset-top));
+            background-color: var(--surface);
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            padding: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+            z-index: 1000;
+        }
+        .header-title {
+            font-weight: bold;
+            font-size: 18px;
+            color: var(--text-muted);
+            margin: 0 auto;
+        }
+
+        .menu-btn {
+            background: none; border: none; color: var(--text);
+            font-size: 24px; padding: 0 10px; cursor: pointer;
+            position: absolute; left: 10px; bottom: 12px;
+        }
+
+        .side-menu-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.7); z-index: 2000;
+            opacity: 0; visibility: hidden; transition: opacity 0.3s;
+        }
+        .side-menu-overlay.active { opacity: 1; visibility: visible; }
+        
+        .side-menu {
+            position: fixed; top: 0; left: -280px; width: 280px; height: 100%;
+            background: var(--surface); z-index: 2001;
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            padding-top: calc(20px + env(safe-area-inset-top));
+            box-shadow: 2px 0 12px rgba(0,0,0,0.5);
+        }
+        .side-menu.active { transform: translateX(280px); }
+        .side-menu h3 { padding: 0 20px; color: var(--primary); }
+        .side-menu a {
+            display: block; padding: 15px 20px; color: var(--text);
+            text-decoration: none; border-bottom: 1px solid #333; font-size: 16px;
+        }
+
+        .tab-content { display: none; animation: fadeIn 0.3s; }
+        .tab-content.active { display: block; }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(5px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .card {
+            background-color: var(--surface);
+            padding: 20px; border-radius: 12px; margin-bottom: 15px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        
+        label { font-size: 14px; color: var(--text-muted); margin-bottom: 5px; display: block; }
+        input[type="text"], input[type="number"] {
+            width: 100%; padding: 15px; margin: 8px 0 20px 0;
+            background-color: var(--bg); border: 1px solid #444; color: white;
+            border-radius: 8px; font-size: 16px; outline: none;
+        }
+        input:focus { border-color: var(--primary); }
+        
+        button.action-btn {
+            width: 100%; padding: 16px; background-color: var(--primary);
+            color: #000; border: none; border-radius: 8px; font-size: 16px;
+            font-weight: bold; cursor: pointer; margin-bottom: 10px;
+        }
+        button.action-btn.secondary { background-color: #444; color: white; }
+        button.action-btn:active { transform: scale(0.98); }
+
+        .bottom-nav {
+            position: fixed; bottom: 0; left: 0; width: 100%;
+            background-color: var(--surface); display: flex; justify-content: center;
+            padding-bottom: env(safe-area-inset-bottom); border-top: 1px solid #333; z-index: 1000;
+        }
+        .bottom-nav-inner { display: flex; width: 100%; max-width: 450px; justify-content: space-around; }
+        .nav-btn {
+            background: none; border: none; color: var(--text-muted);
+            font-size: 11px; flex: 1; padding: 10px 0; cursor: pointer;
+            display: flex; flex-direction: column; align-items: center;
+        }
+        .nav-btn.active { color: var(--primary); font-weight: bold; }
+        .nav-icon { font-size: 22px; margin-bottom: 4px; }
+        
+        .result-text { line-height: 1.6; font-size: 15px; }
+        .text-danger { color: var(--danger); font-weight: bold; }
+        .text-success { color: var(--primary); font-weight: bold; }
+        hr { border: none; border-top: 1px solid #444; margin: 15px 0; }
+
+        #toast {
+            visibility: hidden; min-width: 250px; background-color: #333;
+            color: #fff; text-align: center; border-radius: 8px; padding: 16px;
+            position: fixed; z-index: 3000; left: 50%; bottom: 80px;
+            transform: translateX(-50%); font-size: 14px;
+        }
+        #toast.show { visibility: visible; animation: fadein 0.5s, fadeout 0.5s 2.5s; }
+        @keyframes fadein { from {bottom: 0; opacity: 0;} to {bottom: 80px; opacity: 1;} }
+        @keyframes fadeout { from {bottom: 80px; opacity: 1;} to {bottom: 0; opacity: 0;} }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <button class="menu-btn" onclick="toggleMenu()">☰</button>
+        <div class="header-title">Calc Utility v1.3</div>
+        <div style="width: 30px;"></div>
+    </div>
+
+    <div class="side-menu-overlay" id="menuOverlay" onclick="toggleMenu()"></div>
+    <div class="side-menu" id="sideMenu">
+        <h3>Preferencias</h3>
+        <a href="#" onclick="toggleMenu(); switchTab('tab-scanner', document.getElementById('nav-scanner'))">🔍 Escáner (Módulo 1)</a>
+        <a href="#" onclick="toggleMenu(); switchTab('tab-dutching', document.getElementById('nav-dutching'))">⚖️ Divisor (Módulo 2)</a>
+        <a href="#" onclick="toggleMenu(); switchTab('tab-history', document.getElementById('nav-history'))">📊 Base de Datos (Módulo 3)</a>
+        <a href="#" onclick="limpiarCache()" style="color: var(--danger); margin-top:20px;">⚠️ Limpiar Caché (Borrar todo)</a>
+        <a href="#" onclick="toggleMenu()">❌ Cerrar Menú</a>
+    </div>
+
+    <div class="app-container">
+        <!-- PESTAÑA ESCANER -->
+        <div id="tab-scanner" class="tab-content active">
+            <div class="card">
+                <h3 style="margin-top:0;">Análisis de Serie</h3>
+                
+                <!-- Input de Cámara Oculto -->
+                <input type="file" id="camera-input" accept="image/*" capture="environment" style="display:none;" onchange="procesarImagenOCR(event)">
+                
+                <!-- Botón de Cámara -->
+                <button class="action-btn secondary" onclick="document.getElementById('camera-input').click()">
+                    📷 Importar Doc (Auto)
+                </button>
+                <div style="font-size: 12px; color: #888; text-align: center; margin-bottom: 15px;">*Toma una foto a la matriz. SIEMPRE verifica los datos.</div>
+
+                <label>Variables (separadas por espacio):</label>
+                <input type="text" id="odds-input" inputmode="decimal" placeholder="Ej: 6.8 4.6 7.2 5.5..." autocomplete="off">
+                <button class="action-btn" onclick="analizarCuotas()">Ejecutar Análisis</button>
+            </div>
+            <div id="scanner-result" class="card result-text" style="display:none;"></div>
+        </div>
+
+        <!-- PESTAÑA DUTCHING -->
+        <div id="tab-dutching" class="tab-content">
+            <div class="card">
+                <h3 style="margin-top:0;">Distribución de Activos</h3>
+                <label>Capital Total (Fondo):</label>
+                <input type="number" id="stake-input" inputmode="decimal" placeholder="Ej: 100" autocomplete="off">
+                <label>Métricas elegidas (separadas por espacio):</label>
+                <input type="text" id="dutch-odds-input" inputmode="decimal" placeholder="Ej: 4.6 4.4" autocomplete="off">
+                <button class="action-btn" onclick="calcularDutching()">Calcular Distribución</button>
+            </div>
+            <div id="dutching-result" class="card result-text" style="display:none;"></div>
+        </div>
+
+        <!-- PESTAÑA HISTORIAL -->
+        <div id="tab-history" class="tab-content">
+            <div class="card">
+                <h3 style="margin-top:0;">Ingresar Nuevo Registro</h3>
+                <label>Valor de éxito (Ganador):</label>
+                <input type="number" id="win-odds" inputmode="decimal" placeholder="Ej: 4.4" autocomplete="off">
+                <label>Serie de valores (8 totales):</label>
+                <input type="text" id="all-odds-hist" inputmode="decimal" placeholder="Ej: 6.8 4.6 7.2..." autocomplete="off">
+                <button class="action-btn" onclick="guardarCarrera()">Guardar en LocalStorage</button>
+            </div>
+            <div class="card">
+                <h3 style="margin-top:0;">Diagnóstico de Sistema</h3>
+                <button class="action-btn secondary" onclick="analizarHistorial()">Generar Reporte</button>
+                <div id="history-result" class="result-text" style="margin-top:15px; display:none;"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="bottom-nav">
+        <div class="bottom-nav-inner">
+            <button class="nav-btn active" id="nav-scanner" onclick="switchTab('tab-scanner', this)">
+                <span class="nav-icon">👁️</span> Serie
+            </button>
+            <button class="nav-btn" id="nav-dutching" onclick="switchTab('tab-dutching', this)">
+                <span class="nav-icon">➗</span> Dividir
+            </button>
+            <button class="nav-btn" id="nav-history" onclick="switchTab('tab-history', this)">
+                <span class="nav-icon">📋</span> Registros
+            </button>
+        </div>
+    </div>
+
+    <div id="toast">Acción completada</div>
+
+    <script>
+        let toastTimeout;
+        function showToast(msg, duration=3000) {
+            const toast = document.getElementById("toast");
+            toast.innerText = msg;
+            toast.className = "show";
+            clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(function(){ toast.className = toast.className.replace("show", ""); }, duration);
+        }
+
+        function toggleMenu() {
+            document.getElementById("sideMenu").classList.toggle("active");
+            document.getElementById("menuOverlay").classList.toggle("active");
+        }
+
+        function switchTab(tabId, btn) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+            btn.classList.add('active');
+            window.scrollTo(0,0);
+        }
+
+        // LÓGICA DE CÁMARA OCR
+        async function procesarImagenOCR(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            showToast("📸 Procesando imagen, por favor espera...", 5000);
+            
+            try {
+                const result = await Tesseract.recognize(file, 'eng');
+                const text = result.data.text.replace(/\n/g, ' ');
+                
+                // Expresión regular para buscar números con decimales (ej: 4.4 o 4,4 o 174,1)
+                const regex = /\b\d+[\.,]\d\b/g;
+                let matches = text.match(regex);
+
+                if (matches) {
+                    // Normalizar comas a puntos
+                    matches = matches.map(m => m.replace(',', '.'));
+                    
+                    let finalOdds = [];
+                    // Si encuentra la tabla entera (8x8 = 64 números aprox), intenta sacar la diagonal
+                    if (matches.length >= 60) {
+                        for (let i = 0; i < 8; i++) {
+                            // La diagonal en una matriz plana leída por filas es índice = i*8 + i
+                            let idx = (i * 8) + i;
+                            if(idx < matches.length) finalOdds.push(matches[idx]);
+                        }
+                    } 
+                    // Si encontró pocos, solo toma los primeros 8
+                    else if (matches.length >= 8) {
+                        finalOdds = matches.slice(0, 8);
+                    } 
+                    // Si encontró menos de 8, ponlos todos
+                    else {
+                        finalOdds = matches;
+                    }
+
+                    document.getElementById('odds-input').value = finalOdds.join(' ');
+                    showToast("✅ ¡Datos extraídos! REVISA QUE ESTÉN CORRECTOS.", 4000);
+                } else {
+                    showToast("❌ No se encontraron números claros. Intenta de nuevo.");
+                }
+            } catch (err) {
+                console.error(err);
+                showToast("❌ Error al leer la imagen.");
+            }
+            
+            // Limpiar input para permitir tomar la foto de nuevo
+            event.target.value = '';
+        }
+
+        // Lógica Escáner Manual
+        function analizarCuotas() {
+            const input = document.getElementById('odds-input').value.trim().replace(/,/g, '.');
+            const strOdds = input.split(/\s+/);
+            const resDiv = document.getElementById('scanner-result');
+            
+            if (strOdds.length !== 8) {
+                resDiv.innerHTML = "<span class='text-danger'>Error: Se requieren 8 variables numéricas.</span>";
+                resDiv.style.display = "block";
+                return;
+            }
+
+            let odds = [];
+            let sumProbs = 0;
+            for(let o of strOdds) {
+                let val = parseFloat(o);
+                if(isNaN(val)) return;
+                odds.push(val);
+                sumProbs += (1/val);
+            }
+
+            let overround = sumProbs;
+            let html = `<strong>Desviación (Overround): <span class="text-danger">${((overround-1)*100).toFixed(2)}%</span></strong><br><br>`;
+            html += "<strong>Probabilidad Real Estimada:</strong><br><br>";
+            
+            odds.forEach((o, i) => {
+                let implied = (1/o)*100;
+                let trueProb = implied / overround;
+                html += `V${i+1} | Valor: ${o.toFixed(2)} | Real: <span class="text-success">${trueProb.toFixed(1)}%</span><br>`;
+            });
+
+            resDiv.innerHTML = html;
+            resDiv.style.display = "block";
+        }
+
+        // Lógica Dutching
+        function calcularDutching() {
+            const stake = parseFloat(document.getElementById('stake-input').value);
+            const input = document.getElementById('dutch-odds-input').value.trim().replace(/,/g, '.');
+            const resDiv = document.getElementById('dutching-result');
+
+            if(isNaN(stake) || !input) {
+                resDiv.innerHTML = "<span class='text-danger'>Error: Ingrese datos válidos.</span>";
+                resDiv.style.display = "block";
+                return;
+            }
+
+            const strOdds = input.split(/\s+/);
+            let odds = []; let sumImplied = 0;
+            
+            for(let o of strOdds) {
+                let val = parseFloat(o); odds.push(val); sumImplied += (1/val);
+            }
+
+            if(sumImplied >= 1) {
+                resDiv.innerHTML = "<span class='text-danger'>¡ATENCIÓN! La suma supera el 100%. Pérdida asegurada.</span>";
+                resDiv.style.display = "block"; return;
+            }
+
+            let returnAmount = stake / sumImplied;
+            let html = `<strong>Distribución Óptima de $${stake.toFixed(2)}:</strong><br><br>`;
+            
+            odds.forEach(o => {
+                let s = returnAmount / o;
+                html += `Asignar <strong>$${s.toFixed(2)}</strong> a métrica ${o}<br>`;
+            });
+
+            html += `<br><hr><br>Retorno si acierta: <strong class="text-success">$${returnAmount.toFixed(2)}</strong><br>`;
+            html += `Neto (Delta): <strong class="text-success">$${(returnAmount - stake).toFixed(2)}</strong>`;
+
+            resDiv.innerHTML = html; resDiv.style.display = "block";
+        }
+
+        // Lógica Historial
+        function guardarCarrera() {
+            const winOdds = parseFloat(document.getElementById('win-odds').value.replace(/,/g, '.'));
+            const allOddsStr = document.getElementById('all-odds-hist').value.trim().replace(/,/g, '.').split(/\s+/);
+            
+            if(isNaN(winOdds) || allOddsStr.length !== 8) {
+                showToast("Error: Revisa los 8 campos"); return;
+            }
+
+            let allOdds = allOddsStr.map(Number);
+            let minOdd = Math.min(...allOdds);
+            let isFav = (winOdds === minOdd);
+
+            let history = JSON.parse(localStorage.getItem('vg_history_v2') || '[]');
+            history.push({ winOdds: winOdds, isFav: isFav, date: new Date().getTime() });
+            localStorage.setItem('vg_history_v2', JSON.stringify(history));
+
+            document.getElementById('win-odds').value = '';
+            document.getElementById('all-odds-hist').value = '';
+            showToast("Registro guardado");
+        }
+
+        function analizarHistorial() {
+            let history = JSON.parse(localStorage.getItem('vg_history_v2') || '[]');
+            const resDiv = document.getElementById('history-result');
+            
+            if(history.length === 0) {
+                resDiv.innerHTML = "Base de datos vacía."; resDiv.style.display = "block"; return;
+            }
+
+            let total = history.length;
+            let favWins = history.filter(h => h.isFav).length;
+            let favPct = (favWins / total) * 100;
+
+            let html = `Registros actuales: <strong>${total}</strong><br>`;
+            html += `Incidencia Favoritos: <strong>${favWins} (${favPct.toFixed(1)}%)</strong><br><br>`;
+
+            if(total >= 5) {
+                if(favPct > 35) html += `<span class="text-success">Tendencia: ALTA PREDICCIÓN (Ciclo Favoritos).</span>`;
+                else if(favPct < 15) html += `<span class="text-danger">Tendencia: CAOS ACTIVO (Sorpresas).</span>`;
+                else html += `<span style="color:#aaa;">Tendencia: ESTABLE.</span>`;
+            } else {
+                html += `<span style="color:#888;">Faltan registros (mínimo 5).</span>`;
+            }
+
+            resDiv.innerHTML = html; resDiv.style.display = "block";
+        }
+
+        function limpiarCache() {
+            toggleMenu();
+            if(confirm("¿Borrar todos los registros?")) {
+                localStorage.removeItem('vg_history_v2');
+                document.getElementById('history-result').style.display = "none";
+                showToast("Memoria purgada");
+            }
+        }
+    </script>
+</body>
+</html>
